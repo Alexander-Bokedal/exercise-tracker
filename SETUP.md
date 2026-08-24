@@ -37,16 +37,33 @@ Listens on 127.0.0.1:8088 only — never exposed to the LAN or the internet.
 
     sudo tailscale serve --bg 8088
 
-Reachable at https://raspberrypi-1.caracara-quillback.ts.net — real Let's Encrypt
-cert, tailnet-only. If it errors, enable MagicDNS + HTTPS Certificates at
-https://login.tailscale.com/admin/dns
+Serves it at `https://<machine>.<tailnet>.ts.net` — real Let's Encrypt cert,
+auto-renewing, reachable only from your tailnet. Find your exact URL with:
 
-    tailscale serve status              # check
+    tailscale status --json | grep -m1 DNSName
+
+    tailscale serve status                 # check
     sudo tailscale serve --https=443 off   # undo
+
+### If `tailscale serve` hangs
+
+It needs an HTTPS certificate, which the tailnet must be configured to issue.
+Check:
+
+    tailscale status --json | grep CertDomains
+
+`null` means certificates are off, and `serve` will hang rather than print a
+useful error. Enable them in the admin console: **https://login.tailscale.com/admin/dns**
+-> scroll to the bottom -> **HTTPS Certificates** -> *Enable HTTPS*. It is on
+the DNS page, not under anything named "serve".
+
+Note: enabling this publishes your machine names to public Certificate
+Transparency logs. It leaks the name, not access — the machine stays
+tailnet-only.
 
 ## 3. On your phone
 
-1. Connect Tailscale (`alexanders-z-flip3` is already a registered node).
+1. Connect Tailscale on the phone — it must be signed in to the same tailnet.
 2. Open the URL, then Chrome menu -> "Add to Home screen".
 
 The dot in the header is sync status: green synced, amber syncing, grey offline,
