@@ -1,12 +1,14 @@
+# Template. Install with the sed command in README.md, which fills in
+# __USER__ and __DIR__ for your machine.
 [Unit]
 Description=Training tracker
 After=network.target
 
 [Service]
 Type=simple
-User=bookenpi
-WorkingDirectory=/home/bookenpi/training
-ExecStart=/usr/bin/python3 /home/bookenpi/training/server.py
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=/usr/bin/python3 __DIR__/server.py
 Restart=always
 RestartSec=3
 
@@ -17,7 +19,7 @@ ProtectSystem=strict
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictAddressFamilies=AF_INET AF_INET6
-ReadWritePaths=/home/bookenpi/training/data
+ReadWritePaths=__DIR__/data
 
 [Install]
 WantedBy=multi-user.target

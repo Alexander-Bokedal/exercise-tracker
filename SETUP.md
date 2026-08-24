@@ -14,7 +14,7 @@ each browser's localStorage, so the app works fully offline and syncs when it ca
 | `server.py`  | Static files + `GET`/`PUT /api/state` (stdlib only) |
 | `sw.js`      | Service worker — offline support |
 | `manifest.webmanifest`, `icon.svg` | Home-screen install |
-| `training.service` | systemd unit |
+| `training.service` | systemd unit template (`__USER__` / `__DIR__`) |
 | `tests.py`   | Merge-semantics tests — run after touching `merge()` |
 
 ## 1. Install the server
@@ -23,10 +23,14 @@ each browser's localStorage, so the app works fully offline and syncs when it ca
 > `ReadWritePaths=`, which makes systemd fail with an opaque
 > `status=226/NAMESPACE` crash-loop if the directory is missing (and git does
 > not track empty directories, hence `data/.gitkeep`). If you ever see that
-> error: `mkdir -p ~/training/data && sudo systemctl restart training`.
+> error: `mkdir -p <repo>/data && sudo systemctl restart training`.
 
 
-    sudo cp /home/bookenpi/training/training.service /etc/systemd/system/
+From inside the repo directory:
+
+    mkdir -p data
+    sed -e "s|__USER__|$USER|g" -e "s|__DIR__|$PWD|g" training.service \
+      | sudo tee /etc/systemd/system/training.service >/dev/null
     sudo systemctl daemon-reload
     sudo systemctl enable --now training
     systemctl status training --no-pager
@@ -94,7 +98,7 @@ so installed phones pick up the new version instead of the cached one.
 
 ## Backups
 
-    cp ~/training/data/state.json ~/state-$(date +%F).json
+    cp <repo>/data/state.json ~/state-$(date +%F).json
 
 Or Menu -> Export backup in the app. Import *merges*, so restoring an old backup
 won't wipe newer entries.
