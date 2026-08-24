@@ -1,0 +1,6 @@
+# Runtime state — personal training history, not code
+data/*
+!data/.gitkeep
+
+__pycache__/
+*.pyc

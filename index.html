@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>Training</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E%F0%9F%8F%8B%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0e1116; --card:#171c24; --card2:#1e242e; --line:#262d38;
+    --fg:#e8edf5; --dim:#8a95a5;
+    --fresh:#3fb950; --mid:#d29922; --stale:#f85149; --never:#a371f7;
+    --accent:#3b82f6;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; background:var(--bg); color:var(--fg)}
+  body{
+    font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 88px);
+    -webkit-user-select:none; user-select:none;
+  }
+  .wrap{max-width:560px; margin:0 auto; padding:0 12px}
+
+  header{display:flex; align-items:baseline; gap:10px; padding:18px 4px 10px}
+  h1{font-size:20px; margin:0; letter-spacing:.2px}
+  header .sub{color:var(--dim); font-size:13px; margin-left:auto}
+
+  #sync{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim)}
+  #dot{width:8px; height:8px; border-radius:50%; background:var(--dim); flex-shrink:0}
+  #sync[data-s="ok"] #dot{background:var(--fresh)}
+  #sync[data-s="busy"] #dot{background:var(--mid); animation:pulse 1s infinite}
+  #sync[data-s="off"] #dot{background:var(--dim)}
+  #sync[data-s="err"] #dot{background:var(--stale)}
+  @keyframes pulse{50%{opacity:.25}}
+
+  ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+  li{
+    display:flex; align-items:center; gap:12px;
+    min-height:66px; padding:10px 14px;
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    transition:transform .12s ease, background .12s ease;
+  }
+  li:active{transform:scale(.985); background:var(--card2)}
+  li.done-flash{background:#153021; border-color:#2ea04366}
+  .name{font-size:17px; font-weight:550; flex:1; min-width:0; overflow-wrap:anywhere}
+  .meta{display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex-shrink:0}
+  .ago{font-size:15px; font-weight:650; font-variant-numeric:tabular-nums}
+  .date{font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums}
+  .c-fresh{color:var(--fresh)} .c-mid{color:var(--mid)}
+  .c-stale{color:var(--stale)} .c-never{color:var(--never)}
+
+  .rowbtns{display:none; gap:6px}
+  body.editing .rowbtns{display:flex}
+  body.editing li:active{transform:none}
+  .icon{
+    width:38px; height:38px; flex-shrink:0; border-radius:10px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card2); color:var(--dim);
+    font-size:16px; display:grid; place-items:center;
+  }
+  .icon.del{color:var(--stale)}
+
+  .empty{color:var(--dim); text-align:center; padding:48px 16px; line-height:1.6}
+
+  footer{
+    position:fixed; left:0; right:0; bottom:0;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,#0e111600,#0e1116 28%);
+  }
+  .bar{max-width:560px; margin:0 auto; display:flex; gap:8px}
+  button{font:inherit; cursor:pointer}
+  .btn{
+    flex:1; min-height:52px; border-radius:14px; border:1px solid var(--line);
+    background:var(--card); color:var(--fg); font-weight:600;
+  }
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.grow0{flex:0 0 auto; padding:0 18px}
+
+  #toast{
+    position:fixed; left:12px; right:12px; bottom:calc(78px + env(safe-area-inset-bottom));
+    max-width:536px; margin:0 auto;
+    display:none; align-items:center; gap:12px;
+    padding:12px 12px 12px 16px; border-radius:14px;
+    background:#242b36; border:1px solid #39424f; box-shadow:0 8px 28px #0009;
+  }
+  #toast.show{display:flex}
+  #toast span{flex:1; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  #toast button{
+    background:none; border:none; color:var(--accent); font-weight:700; font-size:14px; padding:6px 8px;
+  }
+
+  dialog{
+    border:1px solid var(--line); background:var(--card); color:var(--fg);
+    border-radius:16px; padding:18px; width:min(92vw,420px);
+  }
+  dialog::backdrop{background:#000a}
+  dialog h2{margin:0 0 14px; font-size:17px}
+  .menu{display:flex; flex-direction:column; gap:8px}
+  .menu .btn{min-height:48px; text-align:left; padding:0 16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Training</h1>
+    <div class="sub" id="sub"></div>
+    <div id="sync" data-s="off"><span id="dot"></span><span id="syncTxt">local</span></div>
+  </header>
+  <ul id="list"></ul>
+  <div class="empty" id="empty" hidden>
+    No exercises yet.<br>Tap <b>+ Add</b> to start, or load the starter set from <b>⋯</b>.
+  </div>
+</div>
+
+<div id="toast"><span id="toastMsg"></span><button id="undoBtn">UNDO</button></div>
+
+<footer>
+  <div class="bar">
+    <button class="btn primary" id="addBtn">+ Add</button>
+    <button class="btn grow0" id="editBtn">Edit</button>
+    <button class="btn grow0" id="menuBtn">⋯</button>
+  </div>
+</footer>
+
+<dialog id="menuDlg">
+  <h2>Menu</h2>
+  <div class="menu">
+    <button class="btn" id="syncNowBtn">🔄 Sync now</button>
+    <button class="btn" id="exportBtn">⬇ Export backup (.json)</button>
+    <button class="btn" id="importBtn">⬆ Import backup</button>
+    <button class="btn" id="seedBtn">✨ Load starter exercises</button>
+    <button class="btn" id="closeMenu">Close</button>
+  </div>
+  <input type="file" id="fileIn" accept="application/json" hidden>
+</dialog>
+
+<script>
+"use strict";
+const KEY = "training.v1";      // same key as v1 so existing data migrates in place
+const DAY = 86400000;
+const API = "api/state";
+
+const STARTER = ["Squat","Deadlift","Bench press","Overhead press","Pull-ups",
+                 "Barbell row","Dips","Leg press","Calf raises","Plank"];
+
+/* ---------------------------------------------------------------- state ----
+ * localStorage stays the source of truth for rendering, so the app is instant
+ * and fully usable with no network. The server is a merge point we push to and
+ * adopt back from — never a thing we block on.
+ */
+let state = load();
+
+function migrate(s){
+  s.version = 2;
+  s.exercises = (s.exercises || []).map(e => ({
+    id: e.id,
+    name: e.name,
+    history: Array.isArray(e.history) ? e.history : [],
+    removed: Array.isArray(e.removed) ? e.removed : [],
+    updated: typeof e.updated === "number" ? e.updated : 0,
+    deleted: !!e.deleted,
+  }));
+  return s;
+}
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      if(Array.isArray(s.exercises)) return migrate(s);
+    }
+  }catch(e){ console.warn("load failed", e); }
+  return { version:2, exercises:[] };
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch(e){ alert("Could not save locally: " + e.message); }
+}
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const live = () => state.exercises.filter(e => !e.deleted);
+const lastDone = ex => ex.history.length ? ex.history[ex.history.length-1] : null;
+
+/* Midnight-based day difference, so "yesterday" means yesterday regardless of time of day. */
+function daysAgo(iso){
+  const then = new Date(iso); then.setHours(0,0,0,0);
+  const now  = new Date();    now.setHours(0,0,0,0);
+  return Math.round((now - then) / DAY);
+}
+
+/* ----------------------------------------------------------------- sync ----
+ * PUT the whole state; the server merges and returns the merged truth, which
+ * we adopt verbatim. That makes every push idempotent and safe to retry, and
+ * means a device that was offline for a week can't overwrite anything.
+ */
+let syncing = false, again = false, timer = null;
+
+function setSync(s, txt){
+  document.getElementById("sync").dataset.s = s;
+  document.getElementById("syncTxt").textContent = txt;
+}
+
+function queueSync(){
+  clearTimeout(timer);
+  timer = setTimeout(sync, 800);
+}
+
+async function sync(){
+  clearTimeout(timer);
+  if(syncing){ again = true; return; }
+  if(!navigator.onLine){ setSync("off","offline"); return; }
+
+  syncing = true;
+  setSync("busy","syncing");
+  try{
+    const res = await fetch(API, {
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(state),
+    });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const merged = await res.json();
+    if(!Array.isArray(merged.exercises)) throw new Error("bad response");
+
+    state = migrate(merged);
+    save();
+    render();
+    setSync("ok","synced");
+  }catch(e){
+    console.warn("sync failed", e);
+    setSync(navigator.onLine ? "err" : "off", navigator.onLine ? "sync failed" : "offline");
+  }finally{
+    syncing = false;
+    if(again){ again = false; sync(); }
+  }
+}
+
+/* ---------------------------------------------------------------- render ---*/
+const $ = id => document.getElementById(id);
+const listEl = $("list");
+
+function sorted(){
+  // Stalest first; never-done at the very top. Tapping an exercise sends it to the bottom.
+  return live().sort((a,b)=>{
+    const A = lastDone(a), B = lastDone(b);
+    if(!A && !B) return a.name.localeCompare(b.name);
+    if(!A) return -1;
+    if(!B) return 1;
+    return new Date(A) - new Date(B);
+  });
+}
+
+function agoLabel(ex){
+  const iso = lastDone(ex);
+  if(!iso) return { text:"never", cls:"c-never", date:"" };
+  const d = daysAgo(iso);
+  const cls = d <= 2 ? "c-fresh" : d <= 6 ? "c-mid" : "c-stale";
+  const text = d === 0 ? "today" : d === 1 ? "yesterday" : d + " days";
+  const date = new Date(iso).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  return { text, cls, date };
+}
+
+function render(){
+  const items = sorted();
+  listEl.innerHTML = "";
+  $("empty").hidden = items.length > 0;
+
+  for(const ex of items){
+    const { text, cls, date } = agoLabel(ex);
+    const li = document.createElement("li");
+    li.dataset.id = ex.id;
+
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = ex.name;
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML = `<div class="ago"></div><div class="date"></div>`;
+    const ago = meta.querySelector(".ago");
+    ago.className = "ago " + cls;
+    ago.textContent = text;
+    meta.querySelector(".date").textContent = date;
+
+    const btns = document.createElement("div");
+    btns.className = "rowbtns";
+    btns.innerHTML = `<button class="icon" data-act="rename">✎</button>
+                      <button class="icon del" data-act="delete">🗑</button>`;
+
+    li.append(name, meta, btns);
+    listEl.append(li);
+  }
+
+  const done = live().filter(e => lastDone(e) && daysAgo(lastDone(e)) === 0).length;
+  $("sub").textContent = items.length ? `${items.length} exercises · ${done} done today` : "";
+}
+
+/* --------------------------------------------------------------- actions ---*/
+let undoTimer = null;
+const find = id => state.exercises.find(e => e.id === id);
+
+function markDone(id){
+  const ex = find(id);
+  if(!ex) return;
+  const stamp = new Date().toISOString();
+  ex.history.push(stamp);
+  ex.updated = Date.now();
+  save(); render(); queueSync();
+
+  const li = listEl.querySelector(`li[data-id="${id}"]`);
+  if(li){
+    li.classList.add("done-flash");
+    setTimeout(()=> li.classList.remove("done-flash"), 400);
+  }
+  if(navigator.vibrate) navigator.vibrate(12);
+
+  showToast(`✓ ${ex.name}`, () => {
+    ex.history = ex.history.filter(t => t !== stamp);
+    // Tombstone, not just a local removal — otherwise the server's union merge
+    // would hand this timestamp straight back on the next sync.
+    ex.removed.push(stamp);
+    ex.updated = Date.now();
+    save(); render(); queueSync();
+  });
+}
+
+function showToast(msg, onUndo){
+  $("toastMsg").textContent = msg;
+  $("toast").classList.add("show");
+  $("undoBtn").onclick = () => { onUndo(); hideToast(); };
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(hideToast, 5000);
+}
+const hideToast = () => $("toast").classList.remove("show");
+
+listEl.addEventListener("click", e => {
+  const li = e.target.closest("li");
+  if(!li) return;
+  const id = li.dataset.id;
+  const act = e.target.closest("[data-act]")?.dataset.act;
+
+  if(act === "rename"){
+    const ex = find(id);
+    const name = prompt("Rename exercise", ex.name)?.trim();
+    if(name){ ex.name = name; ex.updated = Date.now(); save(); render(); queueSync(); }
+    return;
+  }
+  if(act === "delete"){
+    const ex = find(id);
+    if(confirm(`Delete "${ex.name}"? Its history is lost.`)){
+      ex.deleted = true;            // tombstone, so it can't come back via merge
+      ex.updated = Date.now();
+      save(); render(); queueSync();
+    }
+    return;
+  }
+  if(!document.body.classList.contains("editing")) markDone(id);
+});
+
+$("addBtn").onclick = () => {
+  const name = prompt("New exercise")?.trim();
+  if(!name) return;
+  state.exercises.push({ id:uid(), name, history:[], removed:[], updated:Date.now(), deleted:false });
+  save(); render(); queueSync();
+};
+
+$("editBtn").onclick = e => {
+  const on = document.body.classList.toggle("editing");
+  e.target.textContent = on ? "Done" : "Edit";
+  hideToast();
+};
+
+/* ------------------------------------------------------------------ menu ---*/
+const dlg = $("menuDlg");
+$("menuBtn").onclick = () => dlg.showModal();
+$("closeMenu").onclick = () => dlg.close();
+$("syncNowBtn").onclick = () => { dlg.close(); sync(); };
+
+$("exportBtn").onclick = () => {
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `training-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
+};
+
+$("importBtn").onclick = () => $("fileIn").click();
+$("fileIn").onchange = async e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const s = JSON.parse(await file.text());
+    if(!Array.isArray(s.exercises)) throw new Error("Not a training backup");
+    if(confirm(`Merge ${s.exercises.length} exercises from this backup into your data?`)){
+      state = migrate(s); save(); render(); dlg.close(); sync();
+    }
+  }catch(err){ alert("Import failed: " + err.message); }
+  e.target.value = "";
+};
+
+$("seedBtn").onclick = () => {
+  const existing = new Set(live().map(e => e.name.toLowerCase()));
+  const added = STARTER.filter(n => !existing.has(n.toLowerCase()));
+  state.exercises.push(...added.map(n =>
+    ({ id:uid(), name:n, history:[], removed:[], updated:Date.now(), deleted:false })));
+  save(); render(); dlg.close(); queueSync();
+};
+
+/* ------------------------------------------------------------------ boot ---*/
+if(navigator.storage?.persist) navigator.storage.persist().catch(()=>{});
+if("serviceWorker" in navigator && location.protocol === "https:")
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+addEventListener("online",  () => sync());
+addEventListener("offline", () => setSync("off","offline"));
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden) return;
+  render();        // day counters go stale if the tab lives across midnight
+  sync();          // and another device may have logged something meanwhile
+});
+
+render();
+sync();
+</script>
+</body>
+</html>
